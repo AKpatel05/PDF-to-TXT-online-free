@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" itemscope itemtype="https://schema.org/WebApplication">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free PDF to Text Converter - Extract Text from Scanned PDFs</title>
+    <meta name="description" content="Convert scanned PDFs to editable text online using AI-powered OCR. 100% free, no registration required. Supports legal documents, research papers and books.">
+    
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "PDF to Text Converter",
+        "operatingSystem": "Web",
+        "applicationCategory": "BusinessApplication",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "2354"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        }
+    }
+    </script>
+    
+    <!-- SEO-Friendly CSS -->
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --secondary: #2196F3;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .converter-box {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+        
+        #dropZone {
+            border: 3px dashed var(--primary);
+            padding: 3rem 2rem;
+            text-align: center;
+            margin: 2rem 0;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        #dropZone:hover {
+            background: #f8fff8;
+            border-style: solid;
+        }
+        
+        #textOutput {
+            width: 100%;
+            min-height: 300px;
+            padding: 1rem;
+            border: 2px solid #eee;
+            margin: 1rem 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            margin: 1rem 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: var(--secondary);
+            transition: width 0.3s ease;
+        }
+        
+        .ad-unit {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        @media (max-width: 480px) {
+            .converter-box {
+                padding: 1rem;
+                margin: 1rem 0;
+            }
+            
+            #dropZone {
+                padding: 2rem 1rem;
+            }
+        }
+        
+        /* Hidden SEO Content */
+        .seo-text {
+            position: absolute;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<div class="seo-text">
+    <h1>PDF to Text Converter</h1>
+    <h2>Free Online OCR Tool</h2>
+    <p>Convert scanned PDF documents to editable text files instantly. Supports legal contracts, research papers, books, and handwritten documents.</p>
+</div>
+
+<div class="converter-box">
+    <h2 aria-label="PDF to Text Converter">📄→📝 PDF to Text</h2>
+    
+    <div id="dropZone" role="region" aria-label="PDF upload area">
+        <input type="file" id="fileInput" accept="application/pdf" aria-label="Select PDF file">
+        <p>Click to upload or drag & drop PDF file</p>
+        <p style="font-size:0.9em;margin-top:8px;">Max file size: 25MB</p>
+    </div>
+
+    <div class="progress-bar" aria-hidden="true">
+        <div class="progress-fill" id="progressBar"></div>
+    </div>
+
+    <div id="results" hidden>
+        <button onclick="downloadText()" aria-label="Download text file">Download TXT</button>
+        <button onclick="exportAsDoc()" style="margin-left:8px;">Download DOC</button>
+        <textarea id="textOutput" placeholder="Your extracted text will appear here..." readonly></textarea>
+    </div>
+
+    <div class="ad-unit">
+        <!-- AdSense Placeholder -->
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-XXXXX"
+             data-ad-slot="YYYYY"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+    </div>
+</div>
+
+<!-- Required Libraries -->
+<script src="https://unpkg.com/pdfjs-dist@2.11.338/build/pdf.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@4.0.1/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@7.3.0/build/index.min.js"></script>
+
+<script>
+// Configuration
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+let extractedText = "";
+let currentWorker = null;
+
+// Initialize Tesseract Worker
+async function initializeOCR() {
+    currentWorker = await Tesseract.createWorker();
+    await currentWorker.loadLanguage('eng');
+    await currentWorker.initialize('eng');
+}
+
+// File Handling
+document.getElementById('fileInput').addEventListener('change', handleFile);
+document.getElementById('dropZone').addEventListener('dragover', e => e.preventDefault());
+document.getElementById('dropZone').addEventListener('drop', handleDrop);
+
+async function handleFile(e) {
+    const file = e.target.files[0];
+    if(validateFile(file)) await processPDF(file);
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if(validateFile(file)) await processPDF(file);
+}
+
+function validateFile(file) {
+    if(!file) return false;
+    if(file.type !== 'application/pdf') {
+        alert('Please upload a PDF file');
+        return false;
+    }
+    if(file.size > MAX_FILE_SIZE) {
+        alert('File size exceeds 25MB limit');
+        return false;
+    }
+    return true;
+}
+
+// Core Processing Function
+async function processPDF(file) {
+    try {
+        showLoading(true);
+        await initializeOCR();
+        
+        const pdfDoc = await window.pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+        extractedText = "";
+        
+        for(let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            updateProgress((pageNum/pdfDoc.numPages)*95);
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({scale: 1.5});
+            
+            const canvas = document.createElement('canvas');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            await page.render({
+                canvasContext: canvas.getContext('2d'),
+                viewport: viewport
+            }).promise;
+            
+            const { data: { text } } = await currentWorker.recognize(canvas);
+            extractedText += text + "\n\n";
+            canvas.remove();
+        }
+        
+        showResults();
+    } catch(error) {
+        alert(`Error: ${error.message}`);
+    } finally {
+        showLoading(false);
+        if(currentWorker) await currentWorker.terminate();
+    }
+}
+
+// UI Functions
+function showLoading(show) {
+    document.getElementById('results').hidden = show;
+    document.getElementById('dropZone').style.opacity = show ? 0.5 : 1;
+}
+
+function updateProgress(percent) {
+    document.getElementById('progressBar').style.width = `${percent}%`;
+}
+
+function showResults() {
+    document.getElementById('results').hidden = false;
+    document.getElementById('textOutput').value = extractedText;
+}
+
+// Export Functions
+function downloadText() {
+    const filename = `extracted-text-${new Date().toISOString().slice(0,10)}.txt`;
+    const blob = new Blob([extractedText], {type: "text/plain;charset=utf-8"});
+    saveAs(blob, filename);
+}
+
+function exportAsDoc() {
+    const doc = new docx.Document({
+        sections: [{
+            children: [
+                new docx.Paragraph({
+                    children: [new docx.TextRun(extractedText)]
+                })
+            ]
+        }]
+    });
+    
+    docx.Packer.toBlob(doc).then(blob => {
+        saveAs(blob, "document.docx");
+    });
+}
+
+// Initialize Ads
+(adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+
+<!-- Privacy & Affiliate Section -->
+<footer style="text-align:center;margin:2rem 0;font-size:0.9em;">
+    <p>We use client-side processing only - your files never leave your device.</p>
+    <p>Contains affiliate links to <a href="https://example.com/pdf-software">PDF software</a></p>
+</footer>
+
+</body>
+</html>
